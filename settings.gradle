@@ -1,0 +1,8 @@
+include 'gradle-plugin-monkeypatch'
+include 'gradle-plugin-randomizedtesting'
+include 'gradle-plugin-elasticsearch-build'
+include 'gradle-plugin-elasticsearch-vagrant'
+include 'securitymanager-mockito'
+include 'securemock'
+include 'elasticsearch-test-framework'
+include 'elasticsearch-test-loggerusage'

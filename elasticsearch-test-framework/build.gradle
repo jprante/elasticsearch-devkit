@@ -1,0 +1,98 @@
+buildscript {
+    repositories {
+        jcenter()
+        maven {
+            url 'http://xbib.org/repository'
+        }
+    }
+    dependencies {
+        classpath "org.xbib.elasticsearch:gradle-plugin-elasticsearch-build:6.2.1.0"
+    }
+}
+
+
+apply plugin: 'org.xbib.gradle.plugin.elasticsearch.build'
+
+configurations {
+    main
+    tests
+    asciidoclet
+}
+
+dependencies {
+    // switch off transitivity, include only shadow jar on classpath and in pom dependency
+    compile(project(path: ':securemock', configuration: 'shadow')) {
+        transitive = false
+    }
+    compile "org.elasticsearch:elasticsearch:${project.property('elasticsearch.version')}"
+    compile "org.elasticsearch:elasticsearch-cli:${project.property('elasticsearch.version')}"
+    compile "org.elasticsearch.client:elasticsearch-rest-client:${project.property('elasticsearch.version')}"
+    compile "org.elasticsearch:mocksocket:${project.property('mocksocket.version')}"
+    compile "com.carrotsearch.randomizedtesting:randomizedtesting-runner:${project.property('randomizedtesting.version')}"
+    compile("junit:junit:${project.property('junit.version')}") {
+        transitive = false
+    }
+    compile "org.hamcrest:hamcrest-all:${project.property('hamcrest.version')}"
+    compile "org.apache.lucene:lucene-test-framework:${project.property('lucene.version')}"
+    compile "org.apache.lucene:lucene-codecs:${project.property('lucene.version')}"
+    compile "org.apache.logging.log4j:log4j-core:${project.property('log4j.version')}"
+    compile "commons-logging:commons-logging:${project.property('commonslogging.version')}"
+    compile "commons-codec:commons-codec:${project.property('commonscodec.version')}"
+    asciidoclet "org.xbib:asciidoclet:${project.property('asciidoclet.version')}"
+}
+
+compileJava.options.compilerArgs << '-Xlint:-rawtypes,-unchecked'
+compileTestJava.options.compilerArgs << '-Xlint:-rawtypes,-unchecked'
+
+javadoc {
+    options.docletpath = configurations.asciidoclet.files.asType(List)
+    options.doclet = 'org.xbib.asciidoclet.Asciidoclet'
+    options.overview = "src/docs/asciidoclet/overview.adoc"
+    options.addStringOption "-base-dir", "${projectDir}"
+    options.addStringOption "-attribute",
+            "name=${project.name},version=${project.version},title-link=https://github.com/${user}/${projectName}"
+    configure(options) {
+        noTimestamp = true
+    }
+}
+
+task testJar(type: Jar, dependsOn: testClasses) {
+    baseName = "${project.archivesBaseName}-tests"
+    from sourceSets.test.output
+}
+
+artifacts {
+    main jar
+    tests testJar
+    archives sourcesJar, javadocJar
+}
+
+clean {
+    delete fileTree('.') { include '.local*.log' }
+}
+
+test {
+    enabled = true
+    configure {
+        classpath = files(configurations.runtime) + configurations.main.artifacts.files + configurations.tests.artifacts.files
+        systemProperty 'tests.gradle_index_compat_versions', versionCollection.versionsIndexCompatibleWithCurrent.join(',')
+        systemProperty 'tests.gradle_wire_compat_versions', versionCollection.versionsWireCompatibleWithCurrent.join(',')
+        systemProperty 'tests.logger.level', 'ALL'
+    }
+}
+test.dependsOn testJar
+
+dependencyLicenses.enabled = false
+dependenciesInfo.enabled = false
+// many forbidden APIs
+forbiddenApisMain.enabled = false
+forbiddenApisTest.enabled = false
+checkstyleMain.enabled = true
+checkstyleTest.enabled = true
+jarHell.enabled = false
+loggerUsageCheck.enabled = false
+
+// objenesis is using Unsafe and
+// > JAR HELL WITH JDK! [module-info.class]
+// LOL
+thirdPartyAudit.enabled = false

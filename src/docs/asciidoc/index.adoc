@@ -1,0 +1,72 @@
+= The xbib developer kit for Elasticsearch
+Documentation by Jörg Prante
+Version 1.0
+:sectnums:
+:toc: preamble
+:toclevels: 4
+:!toc-title: Content
+:description: Elasticsearch test
+:keywords: Elasticsearch, Java, test, framework
+
+== Introduction
+
+Welcome to xbib's developer kit for Elasticsearch. This project is for developing Elasticsaerch plugins.
+It is derived from the mainline Elasticsearch repository and has the following purposes:
+
+- dismantling the code for building Elasticsearch and Elasticsearch plugins
+
+- handing over a tool for plugin developers to support the complete life-cycle of plugins, using private repositories
+
+- patching and fixing the code to help version updates, dependency managements, custom developments,
+especially for plugins outside the mainline development
+
+- learning about the subtleties of Gradle builds
+
+- preparing to make the step from Java 8 to Java 9 and beyond
+
+And last not least, the result should inspire and motivate developers to hack and extend Elasticsearch.
+
+== Analysis
+
+The Elasticsearch code base was always huge and refactoring and modularization efforts were always present.
+Elasticsearch uses Gradle as build tool. The code base can be divided into code for building and testing
+Elasticsearch and Elasticsearch itself.
+
+There is a Gradle mechanism called
+https://docs.gradle.org/current/userguide/organizing_build_logic.html#sec:build_sources[buildSrc]
+which allows the inclusion of Gradle plugins into the current
+build. Elasticsearch uses this mechanism to roll out several Gradle plugins for build, plugin, doc validation,
+and test. The test reuses a customized version of randomizedtesting. And for deploying Elasticsearch to
+virtual machines, vagrant gradle plugins are used.
+
+The gradle test tasks are distributed over several gradle plugins. They are useful in situations where
+the server code is built, for integration testing, for REST testing. Behind the scenes, the test uses
+a test library called the test framework, a large collection of helper classes to execute randomized tests
+and perform mocking of Elasticsearch classes. The test framework mimics the bootstrap of the Elasticsearch
+server as close as possible and runs under a Java Security Manager, which helps to detect non-behaving
+code in the early stage of development.
+
+== New features of this dev kit
+
+This developer kit offers the possibility to introduce new features that are not yet available
+in Elasticsearch builds (and probably will never be).
+
+- Java 8 or Java 9 or higher for compilation
+- Java 9 based Asciidoclet and Asciidoc gradle plugin
+- Monkey patching
+
+== The randomized testing plugin
+
+== The monkey-patch plugin
+
+== The build plugins
+
+== The vagrant plugins
+
+== The secure mock
+
+== The test framework
+
+== Booting a new Elasticsearch version
+
+
