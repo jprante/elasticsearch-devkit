@@ -30,7 +30,7 @@ grant codeBase "${codebase.elasticsearch}" {
   permission java.lang.RuntimePermission "accessDeclaredMembers";
 };
 
-grant codeBase "${codebase.securemock-6.2.1.0-shadow.jar}" {
+grant codeBase "${codebase.securemock-6.2.2.0-shadow.jar}" {
   // needed to access ReflectionFactory (see below)
   permission java.lang.RuntimePermission "accessClassInPackage.sun.reflect";
   // needed for reflection in ibm jdk
