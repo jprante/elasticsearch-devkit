@@ -4,7 +4,6 @@ import com.carrotsearch.ant.tasks.junit4.JUnit4
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
-import org.gradle.api.file.FileCollection
 import org.gradle.api.plugins.JavaBasePlugin
 import org.gradle.api.tasks.TaskContainer
 
@@ -49,7 +48,6 @@ class RandomizedTestingPlugin implements Plugin<Project> {
             // no test task, ok, user will use testing task on their own
             return
         }
-        //taskContainer.remove(testTask)
         Task randomizedTestTask = taskContainer.create([name: 'randomizedTest',
                 type: RandomizedTestingTask,
                 dependsOn: [testTask.dependsOn, 'testClasses'],
@@ -57,10 +55,6 @@ class RandomizedTestingPlugin implements Plugin<Project> {
                 description: 'Runs unit tests with randomized testing'
         ])
         randomizedTestTask.classpath = testTask.classpath
-        FileCollection fileCollection = testTask.project.sourceSets.test.output.classesDirs
-        randomizedTestTask.testClassesDirs = fileCollection
-        Task checkTask = taskContainer.findByPath('check')
-        //checkTask.dependsOn.remove(testTask)
-        checkTask.dependsOn.add(randomizedTestTask)
+        randomizedTestTask.testClassesDirs = testTask.project.sourceSets.test.output.classesDirs
     }
 }

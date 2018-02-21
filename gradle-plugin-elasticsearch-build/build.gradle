@@ -15,7 +15,7 @@ repositories {
 dependencies {
     compile gradleApi()
     compile localGroovy()
-    compile project(':gradle-plugin-randomizedtesting')
+    compile project(':gradle-plugin-randomizedtesting-junit4')
     compile("junit:junit:${project.property('junit.version')}") {
         transitive = false
     }

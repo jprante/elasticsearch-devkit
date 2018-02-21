@@ -2,18 +2,16 @@ package org.xbib.gradle.task.elasticsearch.qa;
 
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.internal.ConventionTask;
-import org.gradle.api.internal.tasks.options.Option;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.Internal;
 import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.TaskAction;
+import org.gradle.process.CommandLineArgumentProvider;
 import org.gradle.process.ExecResult;
 import org.gradle.process.JavaExecSpec;
 import org.gradle.process.JavaForkOptions;
 import org.gradle.process.ProcessForkOptions;
-import org.gradle.process.internal.DefaultJavaExecAction;
 import org.gradle.process.internal.ExecActionFactory;
-import org.gradle.process.internal.ExecHandle;
 import org.gradle.process.internal.JavaExecAction;
 
 import javax.inject.Inject;
@@ -134,6 +132,13 @@ public class ResultJavaExec extends ConventionTask implements JavaExecSpec {
     /**
      * {@inheritDoc}
      */
+    public List<CommandLineArgumentProvider> getJvmArgumentProviders() {
+        return javaExecHandleBuilder.getJvmArgumentProviders();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public Map<String, Object> getSystemProperties() {
         return javaExecHandleBuilder.getSystemProperties();
     }
@@ -249,7 +254,6 @@ public class ResultJavaExec extends ConventionTask implements JavaExecSpec {
     /**
      * {@inheritDoc}
      */
-    @Option(option = "debug-jvm", description = "Enable debugging for the process. The process is started suspended and listening on port 5005. [INCUBATING]")
     public void setDebug(boolean enabled) {
         javaExecHandleBuilder.setDebug(enabled);
     }
@@ -290,6 +294,11 @@ public class ResultJavaExec extends ConventionTask implements JavaExecSpec {
     public ResultJavaExec setArgs(Iterable<?> applicationArgs) {
         javaExecHandleBuilder.setArgs(applicationArgs);
         return this;
+    }
+
+    @Override
+    public List<CommandLineArgumentProvider> getArgumentProviders() {
+        return javaExecHandleBuilder.getArgumentProviders();
     }
 
     /**

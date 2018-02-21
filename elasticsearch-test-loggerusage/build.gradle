@@ -22,11 +22,15 @@ artifacts {
     archives sourcesJar, javadocJar
 }
 
+
+esTest.enabled = false
+randomizedTest.enabled = false
+test.enabled = false
+
 dependencyLicenses.enabled = false
 dependenciesInfo.enabled = false
 forbiddenApisMain.enabled = false
 jarHell.enabled = true
-test.enabled = false
 
 thirdPartyAudit.excludes = [
         // log4j

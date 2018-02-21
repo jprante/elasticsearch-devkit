@@ -9,8 +9,5 @@
 /.classpath
 /.project
 /.gradle
-/build
-/plugins
-/sessions
+build
 *~
-*.MARC

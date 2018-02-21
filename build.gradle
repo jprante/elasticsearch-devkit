@@ -37,4 +37,3 @@ asciidoctor {
             imagesdir: 'img',
             'source-highlighter': 'coderay'
 }
-

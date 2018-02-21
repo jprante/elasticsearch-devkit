@@ -170,25 +170,11 @@ Welcome to xbib's Elasticsearch dev kit gradle build plugin. Meouw.
      * Adds compiler settings to the project.
      */
     static void configureCompile(Project project) {
-        if (project.compilerJavaVersion < JavaVersion.VERSION_1_10) {
-            project.ext.compactProfile = 'compact3'
-        } else {
-            project.ext.compactProfile = 'full'
-        }
         project.afterEvaluate {
             project.tasks.withType(JavaCompile) {
                 final JavaVersion targetCompatibilityVersion = JavaVersion.toVersion(it.targetCompatibility)
-                // we fork because compiling lots of different classes in a shared jvm can eventually trigger GC overhead limitations
                 options.fork = true
-                //options.forkOptions.javaHome = new File(project.compilerJavaHome)
                 options.forkOptions.memoryMaximumSize = "1g"
-                if (targetCompatibilityVersion == JavaVersion.VERSION_1_8) {
-                    // compile with compact 3 profile by default
-                    // NOTE: this is just a compile time check: does not replace testing with a compact3 JRE
-                    if (project.compactProfile != 'full') {
-                        options.compilerArgs << '-profile' << project.compactProfile
-                    }
-                }
                 options.compilerArgs << '-Xlint:all,-deprecation,-serial'
 
                 // either disable annotation processor completely (default) or allow to enable them if an annotation processor is explicitly defined
@@ -374,7 +360,8 @@ Welcome to xbib's Elasticsearch dev kit gradle build plugin. Meouw.
             }
 
             listeners {
-                junitReport()
+                junitXmlReport()
+                junitHtmlReport()
             }
         }
     }
