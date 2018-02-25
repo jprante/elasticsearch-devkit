@@ -1,8 +1,0 @@
-ext {
-    user = 'jprante'
-    projectName = 'Elasticsearch xbib Dev Kit'
-    projectDescription = 'A developer kit for building and testing Elasticsearch and Elasticsearch plugins'
-    scmUrl = 'https://github.com/jprante/elasticsearch-xbib-devkit'
-    scmConnection = 'scm:git:git@github.com/jprante/elasticsearch-xbib-devkit.git'
-    scmDeveloperConnection = 'scm:git:git@github.com/jprante/elasticsearch-xbib-devkit.git'
-}

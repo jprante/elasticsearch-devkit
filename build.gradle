@@ -21,7 +21,6 @@ printf "Date: %s\nHost: %s\nOS: %s %s %s\nJVM: %s %s %s %s\nGradle: %s Groovy: %
 
 allprojects {
 
-    apply from: "${rootProject.projectDir}/gradle/ext.gradle"
     apply from: "${rootProject.projectDir}/gradle/publish.gradle"
 
 }

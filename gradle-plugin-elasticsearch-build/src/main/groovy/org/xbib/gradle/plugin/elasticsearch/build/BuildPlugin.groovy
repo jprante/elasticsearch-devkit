@@ -107,7 +107,7 @@ Welcome to xbib's Elasticsearch dev kit gradle build plugin. Meouw.
             project.rootProject.ext.runtimeJavaVersion = runtimeJavaVersionEnum
             project.rootProject.ext.buildChecksDone = true
 
-            project.ext.versionCollection = new VersionCollection(project)
+            project.rootProject.ext.elasticsearchVersionCollection = new VersionCollection(project)
         }
 
         project.targetCompatibility = minimumRuntimeVersion

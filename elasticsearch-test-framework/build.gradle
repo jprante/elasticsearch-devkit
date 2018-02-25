@@ -49,7 +49,7 @@ javadoc {
     options.overview = "src/docs/asciidoclet/overview.adoc"
     options.addStringOption "-base-dir", "${projectDir}"
     options.addStringOption "-attribute",
-            "name=${project.name},version=${project.version},title-link=https://github.com/${user}/${projectName}"
+            "name=${project.name},version=${project.version},title-link=https://github.com/jprante/elasticsearch-xbib-devkit"
     configure(options) {
         noTimestamp = true
     }
@@ -73,8 +73,8 @@ clean {
 esTest {
     // switch test to jars only for security policy
     classpath = files(configurations.runtime) + configurations.main.artifacts.files + configurations.tests.artifacts.files
-    systemProperty 'tests.gradle_index_compat_versions', versionCollection.versionsIndexCompatibleWithCurrent.join(',')
-    systemProperty 'tests.gradle_wire_compat_versions', versionCollection.versionsWireCompatibleWithCurrent.join(',')
+    systemProperty 'tests.gradle_index_compat_versions', project.rootProject.ext.elasticsearchVersionCollection.versionsIndexCompatibleWithCurrent.join(',')
+    systemProperty 'tests.gradle_wire_compat_versions', project.rootProject.ext.elasticsearchVersionCollection.versionsWireCompatibleWithCurrent.join(',')
     systemProperty 'tests.logger.level', 'ALL'
 }
 esTest.dependsOn jar, testJar
