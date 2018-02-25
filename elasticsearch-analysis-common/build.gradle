@@ -1,0 +1,41 @@
+buildscript {
+    repositories {
+        jcenter()
+        maven {
+            url 'http://xbib.org/repository'
+        }
+    }
+    dependencies {
+        classpath "org.xbib.elasticsearch:gradle-plugin-elasticsearch-build:6.2.2.0"
+    }
+}
+
+apply plugin: 'org.xbib.gradle.plugin.elasticsearch.plugin'
+
+esplugin {
+    description 'Common analyzers for Elasticsearch'
+    classname 'org.elasticsearch.analysis.common.CommonAnalysisPlugin'
+    url 'https://github.com/jprante/elasticsearch-xbib-devkit/elasticsearch-analysis-common'
+}
+
+configurations {
+    wagon
+}
+
+dependencies {
+    testCompile "org.apache.logging.log4j:log4j-core:${project.property('log4j.version')}"
+    wagon "org.apache.maven.wagon:wagon-ssh:${project.property('wagon.version')}"
+}
+
+sourceCompatibility = JavaVersion.VERSION_1_9
+targetCompatibility = JavaVersion.VERSION_1_8
+
+// no dependency licenses
+dependencyLicenses.enabled = false
+// no tests
+test.enabled = false
+// no randomized tests
+randomizedTest.enabled = false
+// Elasticsearch test suite
+esTest.enabled = true
+
