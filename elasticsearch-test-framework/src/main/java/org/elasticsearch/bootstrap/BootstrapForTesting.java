@@ -1,8 +1,6 @@
 package org.elasticsearch.bootstrap;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.apache.lucene.util.LuceneTestCase;
 import org.elasticsearch.SecureSM;
 import org.elasticsearch.common.Booleans;
@@ -44,8 +42,6 @@ import static com.carrotsearch.randomizedtesting.RandomizedTest.systemPropertyAs
  */
 public class BootstrapForTesting {
 
-    private static final Logger logger = LogManager.getLogger(BootstrapForTesting.class);
-
     static {
         // make sure java.io.tmpdir exists always (in case code uses it in a static initializer)
         Path javaTmpDir = PathUtils.get(Objects.requireNonNull(System.getProperty("java.io.tmpdir"),
@@ -67,7 +63,7 @@ public class BootstrapForTesting {
 
         // check for jar hell
         try {
-            JarHell.checkJarHell();
+            JarHellForJava9.checkJarHell();
         } catch (Exception e) {
             throw new RuntimeException("found jar hell in test classpath", e);
         }
@@ -119,12 +115,16 @@ public class BootstrapForTesting {
 
                 final Policy testFramework =
                         Security.readPolicy(BootstrapForTesting.class.getResource("elasticsearch-test-framework.policy"), codebases);
-                final Policy esPolicy = new ESPolicy(codebases, perms, getPluginPermissions(), true);
+                final Policy esPolicy =
+                        new ESPolicy(codebases, perms, getPluginPermissions(), true);
+                final Policy extraPolicy = findExtraPolicy(codebases);
                 Policy.setPolicy(new Policy() {
                     @Override
                     public boolean implies(ProtectionDomain domain, Permission permission) {
                         // implements union
-                        return esPolicy.implies(domain, permission) || testFramework.implies(domain, permission);
+                        return esPolicy.implies(domain, permission) ||
+                                testFramework.implies(domain, permission) ||
+                                (extraPolicy != null && extraPolicy.implies(domain, permission));
                     }
                 });
                 System.setSecurityManager(SecureSM.createTestSecureSM());
@@ -219,7 +219,7 @@ public class BootstrapForTesting {
      */
     @SuppressForbidden(reason = "does evil stuff with paths and urls because devs and jenkins do evil stuff with paths and urls")
     static Set<URL> parseClassPathWithSymlinks() throws Exception {
-        Set<URL> raw = JarHell.parseClassPath();
+        Set<URL> raw = JarHellForJava9.parseClassPath();
         Set<URL> cooked = new HashSet<>(raw.size());
         for (URL url : raw) {
             boolean added = cooked.add(PathUtils.get(url.toURI()).toRealPath().toUri().toURL());
@@ -232,4 +232,15 @@ public class BootstrapForTesting {
 
     // does nothing, just easy way to make sure the class is loaded.
     public static void ensureInitialized() {}
+
+    private static Policy findExtraPolicy(Map<String, URL> codebases) {
+        String extraSecurity = System.getProperty("tests.security.policy");
+        if (extraSecurity != null) {
+            URL url = BootstrapForTesting.class.getResource(extraSecurity);
+            System.err.println("extra security policy = " + extraSecurity + " url = " + url);
+            return url != null ? Security.readPolicy(url, codebases) : null;
+        }
+        return null;
+    }
+
 }
