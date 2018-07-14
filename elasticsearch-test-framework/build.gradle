@@ -37,7 +37,7 @@ dependencies {
     compile "org.apache.logging.log4j:log4j-core:${project.property('log4j.version')}"
     compile "commons-logging:commons-logging:${project.property('commonslogging.version')}"
     compile "commons-codec:commons-codec:${project.property('commonscodec.version')}"
-    asciidoclet "org.xbib:asciidoclet:${project.property('asciidoclet.version')}"
+    asciidoclet "org.asciidoctor:asciidoclet:${project.property('asciidoclet.version')}"
 }
 
 compileJava.options.compilerArgs << '-Xlint:-rawtypes,-unchecked'
@@ -45,7 +45,7 @@ compileTestJava.options.compilerArgs << '-Xlint:-rawtypes,-unchecked'
 
 javadoc {
     options.docletpath = configurations.asciidoclet.files.asType(List)
-    options.doclet = 'org.xbib.asciidoclet.Asciidoclet'
+    options.doclet = 'org.asciidoctor.Asciidoclet'
     options.overview = "src/docs/asciidoclet/overview.adoc"
     options.addStringOption "-base-dir", "${projectDir}"
     options.addStringOption "-attribute",

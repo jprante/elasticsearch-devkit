@@ -27,8 +27,13 @@ dependencies {
     wagon "org.apache.maven.wagon:wagon-ssh:${project.property('wagon.version')}"
 }
 
-sourceCompatibility = JavaVersion.VERSION_1_9
+sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
+
+
+clean {
+    delete fileTree('.') { include '.local*.log' }
+}
 
 // no dependency licenses
 dependencyLicenses.enabled = false
