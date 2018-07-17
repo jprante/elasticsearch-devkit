@@ -1,5 +1,7 @@
 package org.elasticsearch.node;
 
+import org.elasticsearch.common.network.NetworkModule;
+import org.elasticsearch.common.settings.Setting;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.common.util.MockBigArrays;
@@ -15,8 +17,8 @@ import java.util.List;
 
 public class MockNodeTests extends ESTestCase {
     /**
-     * Test that we add the appropriate mock services when their plugins are added. This is a very heavy test for a testing component but
-     * we've broken it in the past so it is important.
+     * Test that we add the appropriate mock services when their plugins are added.
+     * This is a very heavy test for a testing component but we've broken it in the past so it is important.
      */
     public void testComponentsMockedByMarkerPlugins() throws IOException {
         Settings settings = Settings.builder() // All these are required or MockNode will fail to build.
@@ -34,9 +36,7 @@ public class MockNodeTests extends ESTestCase {
         if (useMockSearchService) {
             plugins.add(MockSearchService.TestPlugin.class);
         }
-        logger.info("step 1");
         try (MockNode node = new MockNode(settings, plugins)) {
-            logger.info("step 2: node={}", node);
             BigArrays bigArrays = node.injector().getInstance(BigArrays.class);
             SearchService searchService = node.injector().getInstance(SearchService.class);
             if (useMockBigArrays) {
@@ -50,6 +50,6 @@ public class MockNodeTests extends ESTestCase {
                 assertSame(searchService.getClass(), SearchService.class);
             }
         }
-        logger.info("step 3");
+        assertSettingDeprecationsAndWarnings(new Setting<?>[] { NetworkModule.HTTP_ENABLED });
     }
 }

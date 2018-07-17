@@ -54,7 +54,7 @@ public class StashTests extends ESTestCase {
         assertThat(actual, not(sameInstance(map)));
     }
 
-    public void testReplaceStashedValuesStashKeyInMapKeyConflicts() throws IOException {
+    public void testReplaceStashedValuesStashKeyInMapKeyConflicts() {
         Stash stash = new Stash();
 
         Map<String, Object> map = new HashMap<>();
@@ -100,16 +100,22 @@ public class StashTests extends ESTestCase {
 
     public void testPathInList() throws IOException {
         Stash stash = new Stash();
-        stash.stashValue("body", singletonMap("foo", Arrays.asList("a", "b")));
+        String topLevelKey;
+        if (randomBoolean()) {
+            topLevelKey = randomAlphaOfLength(2) + "." + randomAlphaOfLength(2);
+        } else {
+            topLevelKey = randomAlphaOfLength(5);
+        }
+        stash.stashValue("body", singletonMap(topLevelKey, Arrays.asList("a", "b")));
 
         Map<String, Object> expected;
         Map<String, Object> map;
         if (randomBoolean()) {
-            expected = singletonMap("foo", Arrays.asList("test", "boooooh!"));
-            map = singletonMap("foo", Arrays.asList("test", "${body.$_path}oooooh!"));
+            expected = singletonMap(topLevelKey, Arrays.asList("test", "boooooh!"));
+            map = singletonMap(topLevelKey, Arrays.asList("test", "${body.$_path}oooooh!"));
         } else {
-            expected = singletonMap("foo", Arrays.asList("test", "b"));
-            map = singletonMap("foo", Arrays.asList("test", "$body.$_path"));
+            expected = singletonMap(topLevelKey, Arrays.asList("test", "b"));
+            map = singletonMap(topLevelKey, Arrays.asList("test", "$body.$_path"));
         }
 
         Map<String, Object> actual = stash.replaceStashedValues(map);
@@ -119,16 +125,22 @@ public class StashTests extends ESTestCase {
 
     public void testPathInMapValue() throws IOException {
         Stash stash = new Stash();
-        stash.stashValue("body", singletonMap("foo", singletonMap("a", "b")));
+        String topLevelKey;
+        if (randomBoolean()) {
+            topLevelKey = randomAlphaOfLength(2) + "." + randomAlphaOfLength(2);
+        } else {
+            topLevelKey = randomAlphaOfLength(5);
+        }
+        stash.stashValue("body", singletonMap(topLevelKey, singletonMap("a", "b")));
 
         Map<String, Object> expected;
         Map<String, Object> map;
         if (randomBoolean()) {
-            expected = singletonMap("foo", singletonMap("a", "boooooh!"));
-            map = singletonMap("foo", singletonMap("a", "${body.$_path}oooooh!"));
+            expected = singletonMap(topLevelKey, singletonMap("a", "boooooh!"));
+            map = singletonMap(topLevelKey, singletonMap("a", "${body.$_path}oooooh!"));
         } else {
-            expected = singletonMap("foo", singletonMap("a", "b"));
-            map = singletonMap("foo", singletonMap("a", "$body.$_path"));
+            expected = singletonMap(topLevelKey, singletonMap("a", "b"));
+            map = singletonMap(topLevelKey, singletonMap("a", "$body.$_path"));
         }
 
         Map<String, Object> actual = stash.replaceStashedValues(map);

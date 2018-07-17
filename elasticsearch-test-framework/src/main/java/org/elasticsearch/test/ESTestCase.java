@@ -29,6 +29,7 @@ import org.elasticsearch.bootstrap.BootstrapForTesting;
 import org.elasticsearch.client.Requests;
 import org.elasticsearch.cluster.ClusterModule;
 import org.elasticsearch.cluster.metadata.IndexMetaData;
+import org.elasticsearch.common.CheckedBiFunction;
 import org.elasticsearch.common.CheckedRunnable;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.io.PathUtils;
@@ -38,6 +39,7 @@ import org.elasticsearch.common.io.stream.NamedWriteable;
 import org.elasticsearch.common.io.stream.NamedWriteableAwareStreamInput;
 import org.elasticsearch.common.io.stream.NamedWriteableRegistry;
 import org.elasticsearch.common.io.stream.StreamInput;
+import org.elasticsearch.common.io.stream.Streamable;
 import org.elasticsearch.common.io.stream.Writeable;
 import org.elasticsearch.common.logging.DeprecationLogger;
 import org.elasticsearch.common.logging.Loggers;
@@ -47,6 +49,7 @@ import org.elasticsearch.common.transport.TransportAddress;
 import org.elasticsearch.common.util.MockBigArrays;
 import org.elasticsearch.common.util.MockPageCacheRecycler;
 import org.elasticsearch.common.util.concurrent.ThreadContext;
+import org.elasticsearch.common.xcontent.LoggingDeprecationHandler;
 import org.elasticsearch.common.xcontent.NamedXContentRegistry;
 import org.elasticsearch.common.xcontent.ToXContent;
 import org.elasticsearch.common.xcontent.XContent;
@@ -114,6 +117,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -152,6 +156,8 @@ import static org.hamcrest.Matchers.hasItem;
 @LuceneTestCase.SuppressReproduceLine
 public abstract class ESTestCase extends LuceneTestCase {
 
+    private static final List<String> JODA_TIMEZONE_IDS;
+    private static final List<String> JAVA_TIMEZONE_IDS;
     private static final AtomicInteger portGenerator = new AtomicInteger();
 
     @AfterClass
@@ -170,6 +176,14 @@ public abstract class ESTestCase extends LuceneTestCase {
         }));
 
         BootstrapForTesting.ensureInitialized();
+
+        List<String> jodaTZIds = new ArrayList<>(DateTimeZone.getAvailableIDs());
+        Collections.sort(jodaTZIds);
+        JODA_TIMEZONE_IDS = Collections.unmodifiableList(jodaTZIds);
+
+        List<String> javaTZIds = Arrays.asList(TimeZone.getAvailableIDs());
+        Collections.sort(javaTZIds);
+        JAVA_TIMEZONE_IDS = Collections.unmodifiableList(javaTZIds);
     }
 
     protected final Logger logger = Loggers.getLogger(getClass());
@@ -183,7 +197,7 @@ public abstract class ESTestCase extends LuceneTestCase {
     @Rule
     public RuleChain failureAndSuccessEvents = RuleChain.outerRule(new TestRuleAdapter() {
         @Override
-        protected void afterIfSuccessful() throws Throwable {
+        protected void afterIfSuccessful() {
             ESTestCase.this.afterIfSuccessful();
         }
 
@@ -312,11 +326,14 @@ public abstract class ESTestCase extends LuceneTestCase {
      * @param warnings other expected general deprecation warnings
      */
     protected final void assertSettingDeprecationsAndWarnings(final Setting<?>[] settings, final String... warnings) {
+        assertSettingDeprecationsAndWarnings(Arrays.stream(settings).map(Setting::getKey).toArray(String[]::new), warnings);
+    }
+
+    protected final void assertSettingDeprecationsAndWarnings(final String[] settings, final String... warnings) {
         assertWarnings(
                 Stream.concat(
                         Arrays
                                 .stream(settings)
-                                .map(Setting::getKey)
                                 .map(k -> "[" + k + "] setting was deprecated in Elasticsearch and will be removed in a future release! " +
                                         "See the breaking changes documentation for the next major version."),
                         Arrays.stream(warnings))
@@ -512,6 +529,19 @@ public abstract class ESTestCase extends LuceneTestCase {
 
     public static byte randomByte() {
         return (byte) random().nextInt();
+    }
+
+    /**
+     * Helper method to create a byte array of a given length populated with random byte values
+     *
+     * @see #randomByte()
+     */
+    public static byte[] randomByteArrayOfLength(int size) {
+        byte[] bytes = new byte[size];
+        for (int i = 0; i < size; i++) {
+            bytes[i] = randomByte();
+        }
+        return bytes;
     }
 
     public static short randomShort() {
@@ -712,9 +742,14 @@ public abstract class ESTestCase extends LuceneTestCase {
      * @return date time zone
      */
     public static DateTimeZone randomDateTimeZone() {
-        List<String> ids = new ArrayList<>(DateTimeZone.getAvailableIDs());
-        Collections.sort(ids);
-        return DateTimeZone.forID(randomFrom(ids));
+        return DateTimeZone.forID(randomFrom(JODA_TIMEZONE_IDS));
+    }
+
+    /**
+     * generate a random TimeZone from the ones available in java.time
+     */
+    public static TimeZone randomTimeZone() {
+        return TimeZone.getTimeZone(randomFrom(JAVA_TIMEZONE_IDS));
     }
 
     /**
@@ -1005,6 +1040,16 @@ public abstract class ESTestCase extends LuceneTestCase {
     }
 
     /**
+     * Returns the bytes that represent the XContent output of the provided {@link ToXContent} object, using the provided
+     * {@link XContentType}. Wraps the output into a new anonymous object according to the value returned
+     * by the {@link ToXContent#isFragment()} method returns. Shuffles the keys to make sure that parsing never relies on keys ordering.
+     */
+    protected final BytesReference toShuffledXContent(ToXContent toXContent, XContentType xContentType, ToXContent.Params params,
+                                                      boolean humanReadable, String... exceptFieldNames) throws IOException{
+        return toShuffledXContent(toXContent, xContentType, params, humanReadable, this::createParser, exceptFieldNames);
+    }
+
+    /**
      * Returns the bytes that represent the XContent output of the provided {@link ToXContent} object,
      * using the provided {@link XContentType}. Wraps the output into a new anonymous object
      * according to the value returned by the {@link ToXContent#isFragment()} method returns.
@@ -1017,12 +1062,15 @@ public abstract class ESTestCase extends LuceneTestCase {
      * @return byte reference
      * @throws IOException if XContent builder fails
      */
-    protected final BytesReference toShuffledXContent(ToXContent toXContent, XContentType xContentType, ToXContent.Params params,
-                                                      boolean humanReadable, String... exceptFieldNames) throws IOException{
+    protected static BytesReference toShuffledXContent(ToXContent toXContent, XContentType xContentType, ToXContent.Params params,
+                                                      boolean humanReadable,
+                                                       CheckedBiFunction<XContent, BytesReference, XContentParser, IOException>
+                                                               parserFunction,
+                                                       String... exceptFieldNames) throws IOException{
         BytesReference bytes = XContentHelper.toXContent(toXContent, xContentType, params, humanReadable);
-        try (XContentParser parser = createParser(xContentType.xContent(), bytes)) {
+        try (XContentParser parser = parserFunction.apply(xContentType.xContent(), bytes)) {
             try (XContentBuilder builder = shuffleXContent(parser, rarely(), exceptFieldNames)) {
-                return builder.bytes();
+                return BytesReference.bytes(builder);
             }
         }
     }
@@ -1054,7 +1102,8 @@ public abstract class ESTestCase extends LuceneTestCase {
      * @return XContent builder
      * @throws IOException if parser could not be created
      */
-    public XContentBuilder shuffleXContent(XContentParser parser, boolean prettyPrint, String... exceptFieldNames) throws IOException {
+    public static XContentBuilder shuffleXContent(XContentParser parser, boolean prettyPrint,
+                                                  String... exceptFieldNames) throws IOException {
         XContentBuilder xContentBuilder = XContentFactory.contentBuilder(parser.contentType());
         if (prettyPrint) {
             xContentBuilder.prettyPrint();
@@ -1071,6 +1120,7 @@ public abstract class ESTestCase extends LuceneTestCase {
     }
 
     // shuffle fields of objects in the list, but not the list itself
+    @SuppressWarnings("unchecked")
     private static List<Object> shuffleList(List<Object> list, Set<String> exceptFields) {
         List<Object> targetList = new ArrayList<>();
         for(Object value : list) {
@@ -1087,6 +1137,7 @@ public abstract class ESTestCase extends LuceneTestCase {
         return targetList;
     }
 
+    @SuppressWarnings("unchecked")
     public static LinkedHashMap<String, Object> shuffleMap(LinkedHashMap<String, Object> map, Set<String> exceptFields) {
         List<String> keys = new ArrayList<>(map.keySet());
         LinkedHashMap<String, Object> targetMap = new LinkedHashMap<>();
@@ -1111,19 +1162,40 @@ public abstract class ESTestCase extends LuceneTestCase {
      * reading it in again using a provided {@link Writeable.Reader}. The stream that is wrapped around the {@link StreamInput}
      * potentially need to use a {@link NamedWriteableRegistry}, so this needs to be provided too (although it can be
      * empty if the object that is streamed doesn't contain any {@link NamedWriteable} objects itself.
-     *
-     * @param <T> parameter type of Writable
-     * @param original original
-     * @param namedWritabelRegistry named writable registry
-     * @param reader reader
-     * @return copy of original writeable
-     * @throws IOException if method fails
      */
-    public static <T extends Writeable> T copyWriteable(T original, NamedWriteableRegistry namedWritabelRegistry,
-            Writeable.Reader<T> reader) throws IOException {
+    public static <T extends Writeable> T copyWriteable(T original, NamedWriteableRegistry namedWriteableRegistry,
+                                                        Writeable.Reader<T> reader) throws IOException {
+        return copyWriteable(original, namedWriteableRegistry, reader, Version.CURRENT);
+    }
+
+    /**
+     * Same as {@link #copyWriteable(Writeable, NamedWriteableRegistry, Writeable.Reader)} but also allows to provide
+     * a {@link Version} argument which will be used to write and read back the object.
+     */
+    public static <T extends Writeable> T copyWriteable(T original, NamedWriteableRegistry namedWriteableRegistry,
+                                                        Writeable.Reader<T> reader, Version version) throws IOException {
+        return copyInstance(original, namedWriteableRegistry, (out, value) -> value.writeTo(out), reader, version);
+    }
+
+    /**
+     * Create a copy of an original {@link Streamable} object by running it through a {@link BytesStreamOutput} and
+     * reading it in again using a provided {@link Writeable.Reader}. The stream that is wrapped around the {@link StreamInput}
+     * potentially need to use a {@link NamedWriteableRegistry}, so this needs to be provided too (although it can be
+     * empty if the object that is streamed doesn't contain any {@link NamedWriteable} objects itself.
+     */
+    public static <T extends Streamable> T copyStreamable(T original, NamedWriteableRegistry namedWriteableRegistry,
+                                                          Supplier<T> supplier, Version version) throws IOException {
+        return copyInstance(original, namedWriteableRegistry, (out, value) -> value.writeTo(out),
+                Streamable.newWriteableReader(supplier), version);
+    }
+
+    private static <T> T copyInstance(T original, NamedWriteableRegistry namedWriteableRegistry, Writeable.Writer<T> writer,
+                                      Writeable.Reader<T> reader, Version version) throws IOException {
         try (BytesStreamOutput output = new BytesStreamOutput()) {
-            original.writeTo(output);
-            try (StreamInput in = new NamedWriteableAwareStreamInput(output.bytes().streamInput(), namedWritabelRegistry)) {
+            output.setVersion(version);
+            writer.write(output, original);
+            try (StreamInput in = new NamedWriteableAwareStreamInput(output.bytes().streamInput(), namedWriteableRegistry)) {
+                in.setVersion(version);
                 return reader.read(in);
             }
         }
@@ -1198,8 +1270,8 @@ public abstract class ESTestCase extends LuceneTestCase {
             expectedJson.endObject();
             NotEqualMessageBuilder message = new NotEqualMessageBuilder();
             message.compareMaps(
-                    XContentHelper.convertToMap(actualJson.bytes(), false).v2(),
-                    XContentHelper.convertToMap(expectedJson.bytes(), false).v2());
+                    XContentHelper.convertToMap(BytesReference.bytes(actualJson), false).v2(),
+                    XContentHelper.convertToMap(BytesReference.bytes(expectedJson), false).v2());
             throw new AssertionError("Didn't match expected value:\n" + message);
         } catch (IOException e) {
             throw new AssertionError("IOException while building failure message", e);
@@ -1214,7 +1286,8 @@ public abstract class ESTestCase extends LuceneTestCase {
      * @throws IOException if parser could not be created
      */
     protected final XContentParser createParser(XContentBuilder builder) throws IOException {
-        return builder.generator().contentType().xContent().createParser(xContentRegistry(), builder.bytes());
+        return builder.generator().contentType().xContent()
+                .createParser(xContentRegistry(), LoggingDeprecationHandler.INSTANCE, BytesReference.bytes(builder).streamInput());
     }
 
     /**
@@ -1226,7 +1299,7 @@ public abstract class ESTestCase extends LuceneTestCase {
      * @throws IOException if parser could not be created
      */
     protected final XContentParser createParser(XContent xContent, String data) throws IOException {
-        return xContent.createParser(xContentRegistry(), data);
+        return xContent.createParser(xContentRegistry(), LoggingDeprecationHandler.INSTANCE, data);
     }
 
     /**
@@ -1238,7 +1311,7 @@ public abstract class ESTestCase extends LuceneTestCase {
      * @throws IOException if parser could not be created
      */
     protected final XContentParser createParser(XContent xContent, InputStream data) throws IOException {
-        return xContent.createParser(xContentRegistry(), data);
+        return xContent.createParser(xContentRegistry(), LoggingDeprecationHandler.INSTANCE, data);
     }
 
     /**
@@ -1250,7 +1323,7 @@ public abstract class ESTestCase extends LuceneTestCase {
      * @throws IOException if parser could not be created
      */
     protected final XContentParser createParser(XContent xContent, byte[] data) throws IOException {
-        return xContent.createParser(xContentRegistry(), data);
+        return xContent.createParser(xContentRegistry(), LoggingDeprecationHandler.INSTANCE, data);
     }
 
     /**
@@ -1262,7 +1335,7 @@ public abstract class ESTestCase extends LuceneTestCase {
      * @throws IOException if parser could not be created
      */
     protected final XContentParser createParser(XContent xContent, BytesReference data) throws IOException {
-        return xContent.createParser(xContentRegistry(), data);
+        return xContent.createParser(xContentRegistry(), LoggingDeprecationHandler.INSTANCE, data.streamInput());
     }
 
     /**

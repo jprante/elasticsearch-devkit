@@ -6,7 +6,7 @@ buildscript {
         }
     }
     dependencies {
-        classpath "org.xbib.elasticsearch:gradle-plugin-elasticsearch-build:6.2.2.0"
+        classpath "org.xbib.elasticsearch:gradle-plugin-elasticsearch-build:6.3.1.0"
     }
 }
 
@@ -73,9 +73,12 @@ clean {
 esTest {
     // switch test to jars only for security policy
     classpath = files(configurations.runtime) + configurations.main.artifacts.files + configurations.tests.artifacts.files
-    systemProperty 'tests.gradle_index_compat_versions', project.rootProject.ext.elasticsearchVersionCollection.versionsIndexCompatibleWithCurrent.join(',')
-    systemProperty 'tests.gradle_wire_compat_versions', project.rootProject.ext.elasticsearchVersionCollection.versionsWireCompatibleWithCurrent.join(',')
+    systemProperty 'tests.gradle_index_compat_versions', project.rootProject.ext.elasticsearchVersionCollection.getIndexCompatible().join(',')
+    systemProperty 'tests.gradle_wire_compat_versions', project.rootProject.ext.elasticsearchVersionCollection.getWireCompatible().join(',')
     systemProperty 'tests.logger.level', 'ALL'
+
+    println "index compat = " + project.rootProject.ext.elasticsearchVersionCollection.getIndexCompatible().join(',')
+    println "wire compat = " + project.rootProject.ext.elasticsearchVersionCollection.getWireCompatible().join(',')
 }
 esTest.dependsOn jar, testJar
 

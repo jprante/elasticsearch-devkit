@@ -12,7 +12,8 @@ grant codeBase "${codebase.elasticsearch}" {
   permission java.lang.RuntimePermission "accessDeclaredMembers";
 };
 
-grant codeBase "${codebase.securemock-6.2.2.0-shadow.jar}" {
+// update version manually here - a little bit unfortunate
+grant codeBase "${codebase.securemock-6.3.1.0-shadow.jar}" {
   // needed to access ReflectionFactory (see below)
   permission java.lang.RuntimePermission "accessClassInPackage.sun.reflect";
   // needed for reflection in ibm jdk
@@ -42,7 +43,7 @@ grant codeBase "${codebase.randomizedtesting-runner}" {
   // needed to fail tests on uncaught exceptions from other threads
   permission java.lang.RuntimePermission "setDefaultUncaughtExceptionHandler";
   // needed for top threads handling
-  permission org.elasticsearch.ThreadPermission "modifyArbitraryThreadGroup";
+  permission org.elasticsearch.secure_sm.ThreadPermission "modifyArbitraryThreadGroup";
   // needed for TestClass creation
   permission java.lang.RuntimePermission "accessDeclaredMembers";
 };

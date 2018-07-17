@@ -2,6 +2,7 @@ package org.elasticsearch.test;
 
 import com.carrotsearch.randomizedtesting.generators.RandomPicks;
 import com.carrotsearch.randomizedtesting.generators.RandomStrings;
+
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.support.replication.ReplicationResponse.ShardInfo;
 import org.elasticsearch.action.support.replication.ReplicationResponse.ShardInfo.Failure;
@@ -157,7 +158,7 @@ public final class RandomObjects {
             builder.startObject();
             addFields(random, builder, minNumFields, 0);
             builder.endObject();
-            return builder.bytes();
+            return BytesReference.bytes(builder);
         } catch(IOException e) {
             throw new RuntimeException(e);
         }

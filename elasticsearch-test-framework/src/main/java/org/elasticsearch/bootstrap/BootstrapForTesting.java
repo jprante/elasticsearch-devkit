@@ -2,7 +2,6 @@ package org.elasticsearch.bootstrap;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import org.apache.lucene.util.LuceneTestCase;
-import org.elasticsearch.SecureSM;
 import org.elasticsearch.common.Booleans;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.SuppressForbidden;
@@ -10,6 +9,7 @@ import org.elasticsearch.common.io.FileSystemUtils;
 import org.elasticsearch.common.io.PathUtils;
 import org.elasticsearch.common.network.IfConfig;
 import org.elasticsearch.plugins.PluginInfo;
+import org.elasticsearch.secure_sm.SecureSM;
 import org.junit.Assert;
 
 import java.io.InputStream;
@@ -53,7 +53,8 @@ public class BootstrapForTesting {
         }
 
         // just like bootstrap, initialize natives, then SM
-        Bootstrap.initializeNatives(javaTmpDir, true, true, true);
+        final boolean systemCallFilter = Booleans.parseBoolean(System.getProperty("tests.system_call_filter", "true"));
+        Bootstrap.initializeNatives(javaTmpDir, true, systemCallFilter, true);
 
         // initialize probes
         Bootstrap.initializeProbes();
@@ -111,6 +112,7 @@ public class BootstrapForTesting {
                 if (System.getProperty("tests.gradle") == null) {
                     // intellij and eclipse don't package our internal libs, so we need to set the codebases for them manually
                     addClassCodebase(codebases,"plugin-classloader", "org.elasticsearch.plugins.ExtendedPluginsClassLoader");
+                    addClassCodebase(codebases, "elasticsearch-secure-sm", "org.elasticsearch.secure_sm.SecureSM");
                 }
 
                 final Policy testFramework =

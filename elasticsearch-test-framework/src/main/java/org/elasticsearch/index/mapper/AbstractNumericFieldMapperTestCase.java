@@ -1,5 +1,6 @@
 package org.elasticsearch.index.mapper;
 
+import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.compress.CompressedXContent;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.index.IndexService;
@@ -94,9 +95,9 @@ public abstract class AbstractNumericFieldMapperTestCase extends ESSingleNodeTes
     public void testEmptyName() throws IOException {
         // after version 5
         for (String type : TYPES) {
-            String mapping = XContentFactory.jsonBuilder().startObject().startObject("type")
+            String mapping = Strings.toString(XContentFactory.jsonBuilder().startObject().startObject("type")
                 .startObject("properties").startObject("").field("type", type).endObject().endObject()
-                .endObject().endObject().string();
+                .endObject().endObject());
 
             IllegalArgumentException e = expectThrows(IllegalArgumentException.class,
                 () -> parser.parse("type", new CompressedXContent(mapping))
