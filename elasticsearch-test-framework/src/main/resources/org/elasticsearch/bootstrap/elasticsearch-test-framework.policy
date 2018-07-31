@@ -13,7 +13,7 @@ grant codeBase "${codebase.elasticsearch}" {
 };
 
 // update version manually here - a little bit unfortunate
-grant codeBase "${codebase.securemock-6.3.2.0-shadow.jar}" {
+grant codeBase "${codebase.securemock-6.3.2.1-shadow.jar}" {
   // needed to access ReflectionFactory (see below)
   permission java.lang.RuntimePermission "accessClassInPackage.sun.reflect";
   // needed for reflection in ibm jdk

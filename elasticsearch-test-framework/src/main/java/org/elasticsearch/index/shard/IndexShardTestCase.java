@@ -75,6 +75,7 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -91,6 +92,14 @@ import static org.hamcrest.Matchers.hasSize;
 public abstract class IndexShardTestCase extends ESTestCase {
 
     public static final IndexEventListener EMPTY_EVENT_LISTENER = new IndexEventListener() {};
+
+    private static final AtomicBoolean failOnShardFailures = new AtomicBoolean(true);
+
+    private static final Consumer<IndexShard.ShardFailure> DEFAULT_SHARD_FAILURE_HANDLER = failure -> {
+        if (failOnShardFailures.get()) {
+            throw new AssertionError(failure.reason, failure.cause);
+        }
+    };
 
     protected static final PeerRecoveryTargetService.RecoveryListener recoveryListener = new PeerRecoveryTargetService.RecoveryListener() {
         @Override
@@ -112,6 +121,16 @@ public abstract class IndexShardTestCase extends ESTestCase {
         super.setUp();
         threadPool = new TestThreadPool(getClass().getName(), threadPoolSettings());
         primaryTerm = randomIntBetween(1, 100); // use random but fixed term for creating shards
+        failOnShardFailures.set(true);
+    }
+
+    /**
+     * by default, tests will fail if any shard created by this class fails. Tests that cause failures by design
+     * can call this method to ignore those failures
+     *
+     */
+    protected void allowShardFailures() {
+        failOnShardFailures.set(false);
     }
 
     @Override
@@ -286,6 +305,7 @@ public abstract class IndexShardTestCase extends ESTestCase {
                 engineFactory, indexEventListener, indexSearcherWrapper, threadPool,
                 BigArrays.NON_RECYCLING_INSTANCE, warmer, Collections.emptyList(), Arrays.asList(listeners), globalCheckpointSyncer,
                 breakerService);
+            indexShard.addShardFailureCallback(DEFAULT_SHARD_FAILURE_HANDLER);
             success = true;
         } finally {
             if (success == false) {
@@ -342,7 +362,7 @@ public abstract class IndexShardTestCase extends ESTestCase {
         if (primary) {
             recoverShardFromStore(shard);
         } else {
-            recoveryEmptyReplica(shard);
+            recoveryEmptyReplica(shard, true);
         }
         return shard;
     }
@@ -383,11 +403,11 @@ public abstract class IndexShardTestCase extends ESTestCase {
             inSyncIds, newRoutingTable, Collections.emptySet());
     }
 
-    protected void recoveryEmptyReplica(IndexShard replica) throws IOException {
+    protected void recoveryEmptyReplica(IndexShard replica, boolean startReplica) throws IOException {
         IndexShard primary = null;
         try {
             primary = newStartedShard(true);
-            recoverReplica(replica, primary);
+            recoverReplica(replica, primary, startReplica);
         } finally {
             closeShards(primary);
         }
@@ -398,43 +418,50 @@ public abstract class IndexShardTestCase extends ESTestCase {
             Version.CURRENT);
     }
 
+
     /** recovers a replica from the given primary **/
-    protected void recoverReplica(IndexShard replica, IndexShard primary) throws IOException {
+    protected void recoverReplica(IndexShard replica, IndexShard primary, boolean startReplica) throws IOException {
         recoverReplica(replica, primary,
-            (r, sourceNode) -> new RecoveryTarget(r, sourceNode, recoveryListener, version -> {
-            }),
-            true);
+                (r, sourceNode) -> new RecoveryTarget(r, sourceNode, recoveryListener, version -> {
+                }),
+                true, true);
     }
 
     /** recovers a replica from the given primary **/
     protected void recoverReplica(final IndexShard replica,
                                   final IndexShard primary,
                                   final BiFunction<IndexShard, DiscoveryNode, RecoveryTarget> targetSupplier,
-                                  final boolean markAsRecovering) throws IOException {
+                                  final boolean markAsRecovering, final boolean markAsStarted) throws IOException {
         IndexShardRoutingTable.Builder newRoutingTable = new IndexShardRoutingTable.Builder(replica.shardId());
         newRoutingTable.addShard(primary.routingEntry());
         if (replica.routingEntry().isRelocationTarget() == false) {
             newRoutingTable.addShard(replica.routingEntry());
         }
-        recoverReplica(replica, primary, targetSupplier, markAsRecovering,
-            Collections.singleton(primary.routingEntry().allocationId().getId()),
-            newRoutingTable.build());
+        final Set<String> inSyncIds = Collections.singleton(primary.routingEntry().allocationId().getId());
+        final IndexShardRoutingTable routingTable = newRoutingTable.build();
+        recoverUnstartedReplica(replica, primary, targetSupplier, markAsRecovering, inSyncIds, routingTable);
+        if (markAsStarted) {
+            startReplicaAfterRecovery(replica, primary, inSyncIds, routingTable);
+        }
     }
 
     /**
      * Recovers a replica from the give primary, allow the user to supply a custom recovery target. A typical usage of a custom recovery
      * target is to assert things in the various stages of recovery.
+     *
+     * Note: this method keeps the shard in {@link IndexShardState#POST_RECOVERY} and doesn't start it.
+     *
      * @param replica                the recovery target shard
      * @param primary                the recovery source shard
      * @param targetSupplier         supplies an instance of {@link RecoveryTarget}
      * @param markAsRecovering       set to {@code false} if the replica is marked as recovering
      */
-    protected final void recoverReplica(final IndexShard replica,
-                                        final IndexShard primary,
-                                        final BiFunction<IndexShard, DiscoveryNode, RecoveryTarget> targetSupplier,
-                                        final boolean markAsRecovering,
-                                        final Set<String> inSyncIds,
-                                        final IndexShardRoutingTable routingTable) throws IOException {
+    protected final void recoverUnstartedReplica(final IndexShard replica,
+                                                 final IndexShard primary,
+                                                 final BiFunction<IndexShard, DiscoveryNode, RecoveryTarget> targetSupplier,
+                                                 final boolean markAsRecovering,
+                                                 final Set<String> inSyncIds,
+                                                 final IndexShardRoutingTable routingTable) throws IOException {
         final DiscoveryNode pNode = getFakeDiscoNode(primary.routingEntry().currentNodeId());
         final DiscoveryNode rNode = getFakeDiscoNode(replica.routingEntry().currentNodeId());
         if (markAsRecovering) {
@@ -455,35 +482,63 @@ public abstract class IndexShardTestCase extends ESTestCase {
         }
 
         final StartRecoveryRequest request = new StartRecoveryRequest(replica.shardId(), targetAllocationId,
-            pNode, rNode, snapshot, replica.routingEntry().primary(), 0, startingSeqNo);
+                pNode, rNode, snapshot, replica.routingEntry().primary(), 0, startingSeqNo);
         final RecoverySourceHandler recovery = new RecoverySourceHandler(
-            primary,
-            recoveryTarget,
-            request,
-            (int) ByteSizeUnit.MB.toBytes(1),
-            Settings.builder().put(Node.NODE_NAME_SETTING.getKey(), pNode.getName()).build());
-        final ShardRouting initializingReplicaRouting = replica.routingEntry();
+                primary,
+                recoveryTarget,
+                request,
+                (int) ByteSizeUnit.MB.toBytes(1),
+                Settings.builder().put(Node.NODE_NAME_SETTING.getKey(), pNode.getName()).build());
         primary.updateShardState(primary.routingEntry(), primary.getPrimaryTerm(), null, currentClusterStateVersion.incrementAndGet(),
-            inSyncIds, routingTable, Collections.emptySet());
+                inSyncIds, routingTable, Collections.emptySet());
         recovery.recoverToTarget();
         recoveryTarget.markAsDone();
+    }
+
+    protected void startReplicaAfterRecovery(IndexShard replica, IndexShard primary, Set<String> inSyncIds,
+                                             IndexShardRoutingTable routingTable) throws IOException {
+        ShardRouting initializingReplicaRouting = replica.routingEntry();
         IndexShardRoutingTable newRoutingTable =
-            initializingReplicaRouting.isRelocationTarget() ?
-                new IndexShardRoutingTable.Builder(routingTable)
-                    .removeShard(primary.routingEntry())
-                    .addShard(replica.routingEntry())
-                    .build() :
-                new IndexShardRoutingTable.Builder(routingTable)
-                .removeShard(initializingReplicaRouting)
-                .addShard(replica.routingEntry())
-                .build();
+                initializingReplicaRouting.isRelocationTarget() ?
+                        new IndexShardRoutingTable.Builder(routingTable)
+                                .removeShard(primary.routingEntry())
+                                .addShard(replica.routingEntry())
+                                .build() :
+                        new IndexShardRoutingTable.Builder(routingTable)
+                                .removeShard(initializingReplicaRouting)
+                                .addShard(replica.routingEntry())
+                                .build();
         Set<String> inSyncIdsWithReplica = new HashSet<>(inSyncIds);
         inSyncIdsWithReplica.add(replica.routingEntry().allocationId().getId());
         // update both primary and replica shard state
         primary.updateShardState(primary.routingEntry(), primary.getPrimaryTerm(), null, currentClusterStateVersion.incrementAndGet(),
-            inSyncIdsWithReplica, newRoutingTable, Collections.emptySet());
+                inSyncIdsWithReplica, newRoutingTable, Collections.emptySet());
         replica.updateShardState(replica.routingEntry().moveToStarted(), replica.getPrimaryTerm(), null,
-            currentClusterStateVersion.get(), inSyncIdsWithReplica, newRoutingTable, Collections.emptySet());
+                currentClusterStateVersion.get(), inSyncIdsWithReplica, newRoutingTable, Collections.emptySet());
+    }
+
+    /**
+     * promotes a replica to primary, incrementing it's term and starting it if needed
+     */
+    protected void promoteReplica(IndexShard replica, Set<String> inSyncIds, IndexShardRoutingTable routingTable) throws IOException {
+        assertThat(inSyncIds, contains(replica.routingEntry().allocationId().getId()));
+        final ShardRouting routingEntry = newShardRouting(
+                replica.routingEntry().shardId(),
+                replica.routingEntry().currentNodeId(),
+                null,
+                true,
+                ShardRoutingState.STARTED,
+                replica.routingEntry().allocationId());
+
+        final IndexShardRoutingTable newRoutingTable = new IndexShardRoutingTable.Builder(routingTable)
+                .removeShard(replica.routingEntry())
+                .addShard(routingEntry)
+                .build();
+        replica.updateShardState(routingEntry, replica.getPrimaryTerm() + 1,
+                (is, listener) ->
+                        listener.onResponse(new PrimaryReplicaSyncer.ResyncTask(1, "type", "action", "desc", null, Collections.emptyMap())),
+                currentClusterStateVersion.incrementAndGet(),
+                inSyncIds, newRoutingTable, Collections.emptySet());
     }
 
     private Store.MetadataSnapshot getMetadataSnapshotOrEmpty(IndexShard replica) throws IOException {
