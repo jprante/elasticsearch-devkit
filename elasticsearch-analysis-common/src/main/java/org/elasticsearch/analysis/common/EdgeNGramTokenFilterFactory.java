@@ -20,14 +20,14 @@ public class EdgeNGramTokenFilterFactory extends AbstractTokenFilterFactory {
     public static final int SIDE_BACK = 2;
     private final int side;
 
-    EdgeNGramTokenFilterFactory(IndexSettings indexSettings, Environment environment, String name, Settings settings) {
+    public EdgeNGramTokenFilterFactory(IndexSettings indexSettings, Environment environment, String name, Settings settings) {
         super(indexSettings, name, settings);
         this.minGram = settings.getAsInt("min_gram", NGramTokenFilter.DEFAULT_MIN_NGRAM_SIZE);
         this.maxGram = settings.getAsInt("max_gram", NGramTokenFilter.DEFAULT_MAX_NGRAM_SIZE);
         this.side = parseSide(settings.get("side", "front"));
     }
 
-    static int parseSide(String side) {
+    public static int parseSide(String side) {
         switch(side) {
             case "front": return SIDE_FRONT;
             case "back": return SIDE_BACK;

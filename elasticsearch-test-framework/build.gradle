@@ -6,63 +6,52 @@ buildscript {
         }
     }
     dependencies {
-        classpath "org.xbib.elasticsearch:gradle-plugin-elasticsearch-build:6.3.2.1"
+        classpath "org.xbib.elasticsearch:gradle-plugin-elasticsearch-build:6.3.2.4"
     }
 }
 
 apply plugin: 'org.xbib.gradle.plugin.elasticsearch.build'
 
-configurations {
-    main
-    tests
-    asciidoclet
-}
-
 dependencies {
-    // switch off transitivity, include only securemock shadow jar on classpath and in pom dependency
-    compile(project(path: ':securemock', configuration: 'shadow')) {
-        transitive = false
-    }
-    compile "org.elasticsearch:elasticsearch:${project.property('elasticsearch.version')}"
-    compile "org.elasticsearch:elasticsearch-cli:${project.property('elasticsearch.version')}"
-    compile "org.elasticsearch.client:elasticsearch-rest-client:${project.property('elasticsearch.version')}"
-    compile "org.elasticsearch:mocksocket:${project.property('mocksocket.version')}"
-    compile "com.carrotsearch.randomizedtesting:randomizedtesting-runner:${project.property('randomizedtesting.version')}"
-    compile("junit:junit:${project.property('junit.version')}") {
-        transitive = false
-    }
-    compile "org.hamcrest:hamcrest-all:${project.property('hamcrest.version')}"
-    compile "org.apache.lucene:lucene-test-framework:${project.property('lucene.version')}"
-    compile "org.apache.lucene:lucene-codecs:${project.property('lucene.version')}"
-    compile "org.apache.logging.log4j:log4j-core:${project.property('log4j.version')}"
-    compile "commons-logging:commons-logging:${project.property('commonslogging.version')}"
-    compile "commons-codec:commons-codec:${project.property('commonscodec.version')}"
-    asciidoclet "org.asciidoctor:asciidoclet:${project.property('asciidoclet.version')}"
+    compile "org.xbib.elasticsearch:lucene-test-framework:${project.property('elasticsearch-libs.version')}"
+    compile "org.xbib.elasticsearch:randomizedtesting-junit4-ant:${project.property('elasticsearch-libs.version')}"
+    compile "org.xbib.elasticsearch:securemock:${project.property('elasticsearch-libs.version')}"
+    compile "org.xbib.elasticsearch:mocksocket:${project.property('elasticsearch-libs.version')}"
+    compile "org.xbib.elasticsearch:elasticsearch:${project.property('elasticsearch-server.version')}"
+    compile "org.xbib.elasticsearch:elasticsearch-rest-client:${project.property('elasticsearch-client.version')}"
+    
 }
 
-compileJava.options.compilerArgs << '-Xlint:-rawtypes,-unchecked'
-compileTestJava.options.compilerArgs << '-Xlint:-rawtypes,-unchecked'
-
-javadoc {
-    options.docletpath = configurations.asciidoclet.files.asType(List)
-    options.doclet = 'org.asciidoctor.Asciidoclet'
-    options.overview = "src/docs/asciidoclet/overview.adoc"
-    options.addStringOption "-base-dir", "${projectDir}"
-    options.addStringOption "-attribute",
-            "name=${project.name},version=${project.version},title-link=https://github.com/jprante/elasticsearch-xbib-devkit"
-    configure(options) {
-        noTimestamp = true
+afterEvaluate {
+    compileJava {
+        inputs.property("moduleName", 'org.xbib.elasticsearch.test')
+        doFirst {
+            options.compilerArgs = [
+                    '-Xlint:-rawtypes,-unchecked',
+                    '--module-path', classpath.asPath
+            ]
+            classpath = files()
+        }
     }
-}
-
-task testJar(type: Jar, dependsOn: testClasses) {
-    baseName = "${project.archivesBaseName}-tests"
-    from sourceSets.test.output
+    compileTestJava {
+        inputs.property("moduleName", 'org.xbib.elasticsearch.test.test')
+        doFirst {
+            options.compilerArgs = [
+                    '--module-path', classpath.asPath
+            ]
+            classpath = files()
+        }
+    }
+    javadoc {
+        inputs.property("moduleName", 'org.xbib.elasticsearch.test')
+        doFirst {
+            options.addStringOption('-module-path', classpath.asPath)
+            classpath = files()
+        }
+    }
 }
 
 artifacts {
-    main jar
-    tests testJar
     archives sourcesJar, javadocJar
 }
 
@@ -70,135 +59,57 @@ clean {
     delete fileTree('.') { include '.local*.log' }
 }
 
+test {
+    enabled = false
+    dependsOn 'jar', 'testJar'
+    doFirst {
+        classpath = files(configurations.testRuntime) + configurations.mains.artifacts.files + configurations.tests.artifacts.files
+        jvmArgs = [
+                '--module-path', classpath.asPath,
+                '--add-modules', 'ALL-MODULE-PATH'
+        ]
+        testLogging.showStandardStreams = true
+        scanForTestClasses = false
+        include "**/Test*.class"
+        exclude '**/Test*$*.class'
+    }
+}
+
+randomizedTest {
+    enabled = false
+    dependsOn 'jar', 'testJar'
+    doFirst {
+        modulepath = files(configurations.testRuntime) + configurations.mains.artifacts.files + configurations.tests.artifacts.files
+        jvmArgs = [
+                '--module-path', modulepath.asPath,
+                '--add-modules', 'ALL-MODULE-PATH'
+        ]
+        include "**/Test*.class"
+        exclude '**/Test*$*.class'
+        exclude '**/TestingSocketEventHandler.class'
+        exclude '**/TestSelectionKey.class'
+    }
+}
+
 esTest {
-    // switch test to jars only for security policy
-    classpath = files(configurations.runtime) + configurations.main.artifacts.files + configurations.tests.artifacts.files
+    enabled = true
     systemProperty 'tests.gradle_index_compat_versions', project.rootProject.ext.elasticsearchVersionCollection.getIndexCompatible().join(',')
     systemProperty 'tests.gradle_wire_compat_versions', project.rootProject.ext.elasticsearchVersionCollection.getWireCompatible().join(',')
     systemProperty 'tests.logger.level', 'ALL'
-
-    println "index compat = " + project.rootProject.ext.elasticsearchVersionCollection.getIndexCompatible().join(',')
-    println "wire compat = " + project.rootProject.ext.elasticsearchVersionCollection.getWireCompatible().join(',')
+    systemProperty 'tests.security.manager', 'true'
+    //systemProperty 'java.security.debug', 'access,failure'
+    jvmArg '--add-reads=org.xbib.elasticsearch.securemock=org.xbib.elasticsearch.server'
 }
-esTest.dependsOn jar, testJar
 
-randomizedTest.enabled = false
-test.enabled = false
-
+namingConventions.enabled = false
 dependencyLicenses.enabled = false
 dependenciesInfo.enabled = false
-// too many forbidden APIs
-forbiddenApisMain.enabled = false
-forbiddenApisTest.enabled = false
+forbiddenApisMain.enabled = true
+forbiddenApisTest.enabled = true
 checkstyleMain.enabled = true
 checkstyleTest.enabled = true
 jarHell.enabled = true
-loggerUsageCheck.enabled = false
-
-// sun.misc.Unsafe in objenesis
+loggerUsageCheck.enabled = true
 thirdPartyAudit.enabled = false
-thirdPartyAudit.excludes = [
-        // many classes are missing
-        'com.fasterxml.jackson.databind.ObjectMapper',
-        // from log4j
-        'com.conversantmedia.util.concurrent.DisruptorBlockingQueue',
-        'com.conversantmedia.util.concurrent.SpinPolicy',
-        'com.fasterxml.jackson.annotation.JsonInclude$Include',
-        'com.fasterxml.jackson.databind.DeserializationContext',
-        'com.fasterxml.jackson.databind.DeserializationFeature',
-        'com.fasterxml.jackson.databind.JsonMappingException',
-        'com.fasterxml.jackson.databind.JsonNode',
-        'com.fasterxml.jackson.databind.Module$SetupContext',
-        'com.fasterxml.jackson.databind.ObjectReader',
-        'com.fasterxml.jackson.databind.ObjectWriter',
-        'com.fasterxml.jackson.databind.SerializerProvider',
-        'com.fasterxml.jackson.databind.deser.std.StdDeserializer',
-        'com.fasterxml.jackson.databind.deser.std.StdScalarDeserializer',
-        'com.fasterxml.jackson.databind.module.SimpleModule',
-        'com.fasterxml.jackson.databind.ser.impl.SimpleBeanPropertyFilter',
-        'com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider',
-        'com.fasterxml.jackson.databind.ser.std.StdScalarSerializer',
-        'com.fasterxml.jackson.databind.ser.std.StdSerializer',
-        'com.fasterxml.jackson.dataformat.xml.JacksonXmlModule',
-        'com.fasterxml.jackson.dataformat.xml.XmlMapper',
-        'com.fasterxml.jackson.dataformat.xml.util.DefaultXmlPrettyPrinter',
-        'com.fasterxml.jackson.databind.node.JsonNodeFactory',
-        'com.fasterxml.jackson.databind.node.ObjectNode',
-        'org.fusesource.jansi.Ansi',
-        'org.fusesource.jansi.AnsiRenderer$Code',
-        'com.lmax.disruptor.BlockingWaitStrategy',
-        'com.lmax.disruptor.BusySpinWaitStrategy',
-        'com.lmax.disruptor.EventFactory',
-        'com.lmax.disruptor.EventTranslator',
-        'com.lmax.disruptor.EventTranslatorTwoArg',
-        'com.lmax.disruptor.EventTranslatorVararg',
-        'com.lmax.disruptor.ExceptionHandler',
-        'com.lmax.disruptor.LifecycleAware',
-        'com.lmax.disruptor.RingBuffer',
-        'com.lmax.disruptor.Sequence',
-        'com.lmax.disruptor.SequenceReportingEventHandler',
-        'com.lmax.disruptor.SleepingWaitStrategy',
-        'com.lmax.disruptor.TimeoutBlockingWaitStrategy',
-        'com.lmax.disruptor.WaitStrategy',
-        'com.lmax.disruptor.YieldingWaitStrategy',
-        'com.lmax.disruptor.dsl.Disruptor',
-        'com.lmax.disruptor.dsl.ProducerType',
-        'javax.jms.Connection',
-        'javax.jms.ConnectionFactory',
-        'javax.jms.Destination',
-        'javax.jms.JMSException',
-        'javax.jms.MapMessage',
-        'javax.jms.Message',
-        'javax.jms.MessageConsumer',
-        'javax.jms.MessageProducer',
-        'javax.jms.Session',
-        'javax.mail.Authenticator',
-        'javax.mail.Message$RecipientType',
-        'javax.mail.PasswordAuthentication',
-        'javax.mail.Session',
-        'javax.mail.Transport',
-        'javax.mail.internet.InternetAddress',
-        'javax.mail.internet.InternetHeaders',
-        'javax.mail.internet.MimeBodyPart',
-        'javax.mail.internet.MimeMessage',
-        'javax.mail.internet.MimeMultipart',
-        'javax.mail.internet.MimeUtility',
-        'javax.mail.util.ByteArrayDataSource',
-        'javax.persistence.AttributeConverter',
-        'javax.persistence.EntityManager',
-        'javax.persistence.EntityManagerFactory',
-        'javax.persistence.EntityTransaction',
-        'javax.persistence.Persistence',
-        'javax.persistence.PersistenceException',
-        'javax.servlet.ServletContextEvent',
-        'javax.servlet.ServletContextListener',
-        'org.apache.avalon.framework.logger.Logger',
-        'org.apache.commons.compress.compressors.CompressorStreamFactory',
-        'org.apache.commons.compress.utils.IOUtils',
-        'org.apache.commons.csv.CSVFormat',
-        'org.apache.commons.csv.QuoteMode',
-        'org.apache.kafka.clients.producer.Callback',
-        'org.apache.kafka.clients.producer.KafkaProducer',
-        'org.apache.kafka.clients.producer.Producer',
-        'org.apache.kafka.clients.producer.ProducerRecord',
-        'org.apache.kafka.clients.producer.RecordMetadata',
-        'org.codehaus.stax2.XMLStreamWriter2',
-        'org.jctools.queues.MessagePassingQueue$Consumer',
-        'org.jctools.queues.MpscArrayQueue',
-        'org.osgi.framework.AdaptPermission',
-        'org.osgi.framework.AdminPermission',
-        'org.osgi.framework.Bundle',
-        'org.osgi.framework.BundleActivator',
-        'org.osgi.framework.BundleContext',
-        'org.osgi.framework.BundleEvent',
-        'org.osgi.framework.BundleReference',
-        'org.osgi.framework.FrameworkUtil',
-        'org.osgi.framework.ServiceRegistration',
-        'org.osgi.framework.SynchronousBundleListener',
-        'org.osgi.framework.wiring.BundleWire',
-        'org.osgi.framework.wiring.BundleWiring',
-        'org.zeromq.ZMQ$Context',
-        'org.zeromq.ZMQ$Socket',
-        'org.zeromq.ZMQ'
 
-]
+apply from: "${rootProject.projectDir}/gradle/publish.gradle"

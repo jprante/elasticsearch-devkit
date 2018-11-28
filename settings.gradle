@@ -1,6 +1,3 @@
-include 'elasticsearch-test-loggerusage'
-include 'randomizedtesting-junit5'
-include 'securitymanager-mockito'
-include 'securemock'
+
 include 'elasticsearch-test-framework'
 include 'elasticsearch-analysis-common'

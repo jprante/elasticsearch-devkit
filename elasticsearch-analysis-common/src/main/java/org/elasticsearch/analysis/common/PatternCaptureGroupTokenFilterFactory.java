@@ -17,7 +17,7 @@ public class PatternCaptureGroupTokenFilterFactory extends AbstractTokenFilterFa
     private static final String PATTERNS_KEY = "patterns";
     private static final String PRESERVE_ORIG_KEY = "preserve_original";
 
-    PatternCaptureGroupTokenFilterFactory(IndexSettings indexSettings, Environment environment, String name, Settings settings) {
+    public PatternCaptureGroupTokenFilterFactory(IndexSettings indexSettings, Environment environment, String name, Settings settings) {
         super(indexSettings, name, settings);
         List<String> regexes = settings.getAsList(PATTERNS_KEY, null, false);
         if (regexes == null) {

@@ -28,7 +28,10 @@ import org.apache.lucene.analysis.fr.FrenchAnalyzer;
 import org.apache.lucene.analysis.hi.HindiNormalizationFilter;
 import org.apache.lucene.analysis.in.IndicNormalizationFilter;
 import org.apache.lucene.analysis.miscellaneous.ASCIIFoldingFilter;
+import org.apache.lucene.analysis.miscellaneous.DeDuplicatingTokenFilter;
+import org.apache.lucene.analysis.miscellaneous.DeDuplicatingTokenFilterFactory;
 import org.apache.lucene.analysis.miscellaneous.DisableGraphAttribute;
+import org.apache.lucene.analysis.miscellaneous.DuplicateByteSequenceSpotter;
 import org.apache.lucene.analysis.miscellaneous.KeywordRepeatFilter;
 import org.apache.lucene.analysis.miscellaneous.LengthFilter;
 import org.apache.lucene.analysis.miscellaneous.LimitTokenCountFilter;
@@ -246,6 +249,8 @@ public class CommonAnalysisPlugin extends Plugin implements AnalysisPlugin {
                       | WordDelimiterGraphFilter.SPLIT_ON_CASE_CHANGE
                       | WordDelimiterGraphFilter.SPLIT_ON_NUMERICS
                       | WordDelimiterGraphFilter.STEM_ENGLISH_POSSESSIVE, null)));
+        filters.add(PreConfiguredTokenFilter.singleton("deduplicating", false,
+                input -> new DeDuplicatingTokenFilter(input, new DuplicateByteSequenceSpotter())));
         return filters;
     }
 

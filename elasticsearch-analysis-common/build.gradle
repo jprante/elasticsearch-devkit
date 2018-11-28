@@ -6,17 +6,11 @@ buildscript {
         }
     }
     dependencies {
-        classpath "org.xbib.elasticsearch:gradle-plugin-elasticsearch-build:6.3.2.1"
+        classpath "org.xbib.elasticsearch:gradle-plugin-elasticsearch-build:6.3.2.4"
     }
 }
 
 apply plugin: 'org.xbib.gradle.plugin.elasticsearch.plugin'
-
-esplugin {
-    description 'Common analyzers for Elasticsearch'
-    classname 'org.elasticsearch.analysis.common.CommonAnalysisPlugin'
-    url 'https://github.com/jprante/elasticsearch-xbib-devkit/elasticsearch-analysis-common'
-}
 
 configurations {
     wagon
@@ -24,26 +18,62 @@ configurations {
 
 dependencies {
     testCompile project(':elasticsearch-test-framework')
-    // we need an artifact of elasticsearch-test-loggerusage in the repo - how to ?
-    testCompile project(':elasticsearch-test-loggerusage')
-    testCompile "org.apache.logging.log4j:log4j-core:${project.property('log4j.version')}"
+    testCompile "org.xbib.elasticsearch:elasticsearch:${project.property('elasticsearch-server.version')}"
     wagon "org.apache.maven.wagon:wagon-ssh:${project.property('wagon.version')}"
 }
 
-sourceCompatibility = JavaVersion.VERSION_1_8
-targetCompatibility = JavaVersion.VERSION_1_8
-
+afterEvaluate {
+    compileJava {
+        inputs.property("moduleName", 'org.xbib.elasticsearch.analysis.common')
+        doFirst {
+            options.compilerArgs = [
+                    '--module-path', classpath.asPath
+            ]
+            classpath = files()
+        }
+    }
+    compileTestJava {
+        inputs.property("moduleName", 'org.xbib.elasticsearch.analysis.common.test')
+        doFirst {
+            options.compilerArgs = [
+                    '--module-path', classpath.asPath
+            ]
+            classpath = files()
+        }
+    }
+    javadoc {
+        inputs.property("moduleName", 'org.xbib.elasticsearch.analysis.common')
+        doFirst {
+            options.addStringOption('-module-path', classpath.asPath)
+            classpath = files()
+        }
+    }
+}
 
 clean {
     delete fileTree('.') { include '.local*.log' }
 }
 
-// no dependency licenses
-dependencyLicenses.enabled = false
-// no tests
-test.enabled = false
-// no randomized tests
-randomizedTest.enabled = false
-// Elasticsearch test suite
-esTest.enabled = true
+esplugin {
+    description 'Common analyzers for Elasticsearch'
+    classname 'org.elasticsearch.analysis.common.CommonAnalysisPlugin'
+    url 'https://github.com/jprante/elasticsearch-devkit/elasticsearch-analysis-common'
+}
 
+dependencyLicenses.enabled = false
+// do not run junit tests
+test.enabled = false
+// do not run randomized tests
+randomizedTest.enabled = false
+// run Elasticsearch tests
+esTest {
+    enabled = true
+    systemProperty 'tests.logger.level', 'ALL'
+    systemProperty 'tests.security.manager', 'true'
+    //systemProperty 'java.security.debug', 'access,failure'
+}
+integTest {
+    enabled = true
+}
+
+apply from: "${rootProject.projectDir}/gradle/publish.gradle"
