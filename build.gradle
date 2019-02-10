@@ -3,4 +3,3 @@ plugins {
 }
 
 apply from: "${rootProject.projectDir}/gradle/doc.gradle"
-
