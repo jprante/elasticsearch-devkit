@@ -7,16 +7,18 @@ grant {
 //// These are mock objects and test management that we allow test framework libs
 //// to provide on our behalf. But tests themselves cannot do this stuff.
 
-grant codeBase "file://${codebase.elasticsearch-test-framework}" {
-    permission java.lang.RuntimePermission "accessDeclaredMembers";
-};
-
 grant codeBase "file://${codebase.elasticsearch}" {
     // needed by mockito/bytebuddy for creating mocks with the protection domain
     permission java.lang.RuntimePermission "accessDeclaredMembers";
+    permission java.lang.reflect.ReflectPermission "suppressAccessChecks";
 };
 
 grant codeBase "file://${codebase.elasticsearch-tests}" {
+    permission java.lang.RuntimePermission "accessDeclaredMembers";
+    permission java.lang.reflect.ReflectPermission "suppressAccessChecks";
+};
+
+grant codeBase "file://${codebase.elasticsearch-test-framework}" {
     permission java.lang.RuntimePermission "accessDeclaredMembers";
     permission java.lang.reflect.ReflectPermission "suppressAccessChecks";
 };
@@ -39,6 +41,16 @@ grant codeBase "file://${codebase.lucene-test-framework}" {
     permission java.io.FilePermission "*", "read";
 };
 
+grant codeBase "file://${codebase.randomizedtesting-junit4-ant}" {
+    permission org.elasticsearch.secure_sm.ThreadPermission "modifyArbitraryThreadGroup";
+    // needed to fail tests on uncaught exceptions from other threads
+    permission java.lang.RuntimePermission "setDefaultUncaughtExceptionHandler";
+    // optionally needed for access to private test methods (e.g. beforeClass)
+    permission java.lang.reflect.ReflectPermission "suppressAccessChecks";
+    // needed for TestClass creation
+    permission java.lang.RuntimePermission "accessDeclaredMembers";
+};
+
 grant codeBase "file://${codebase.randomizedtesting}" {
     permission org.elasticsearch.secure_sm.ThreadPermission "modifyArbitraryThreadGroup";
     // needed to fail tests on uncaught exceptions from other threads
@@ -52,11 +64,13 @@ grant codeBase "file://${codebase.randomizedtesting}" {
 grant codeBase "file://${codebase.junit}" {
     // needed for TestClass creation
     permission java.lang.RuntimePermission "accessDeclaredMembers";
+    permission java.lang.reflect.ReflectPermission "suppressAccessChecks";
 };
 
 grant codeBase "file://${codebase.securemock}" {
     // needed to access ReflectionFactory
     permission java.lang.RuntimePermission "accessClassInPackage.sun.reflect";
+    permission java.lang.RuntimePermission "accessClassInPackage.jdk.internal.ref";
     // needed to define classes
     permission java.lang.RuntimePermission "defineClass";
     // needed to support creation of mocks
@@ -67,7 +81,6 @@ grant codeBase "file://${codebase.securemock}" {
     permission java.lang.RuntimePermission "createClassLoader";
     permission java.lang.RuntimePermission "getClassLoader";
     permission java.lang.reflect.ReflectPermission "suppressAccessChecks";
-    permission java.lang.RuntimePermission "accessClassInPackage.jdk.internal.ref";
     // caller class in new Mockito
     permission java.lang.RuntimePermission "getStackWalkerWithClassReference";
 };
