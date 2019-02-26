@@ -11,6 +11,7 @@ buildscript {
 }
 
 apply plugin: 'org.xbib.gradle.plugin.elasticsearch.plugin'
+apply plugin: 'signing'
 
 configurations {
     wagon
@@ -61,10 +62,13 @@ esplugin {
 }
 
 dependencyLicenses.enabled = false
+
 // do not run junit tests
 test.enabled = false
+
 // do not run randomized tests
 randomizedTest.enabled = false
+
 // run Elasticsearch tests
 esTest {
     enabled = true
@@ -72,8 +76,22 @@ esTest {
     systemProperty 'tests.security.manager', 'true'
     //systemProperty 'java.security.debug', 'access,failure'
 }
+
 integTest {
-    enabled = true
+    enabled = false // 0 Tests
+}
+
+configurations {
+    archives
+}
+
+artifacts {
+    archives jar, testJar, sourcesJar, javadocJar, bundlePlugin
+}
+
+signing {
+    sign bundlePlugin
+    sign testJar
 }
 
 apply from: "${rootProject.projectDir}/gradle/publish.gradle"
