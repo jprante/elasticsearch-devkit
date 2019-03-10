@@ -1,3 +1,2 @@
 
 include 'elasticsearch-test-framework'
-include 'elasticsearch-analysis-common'

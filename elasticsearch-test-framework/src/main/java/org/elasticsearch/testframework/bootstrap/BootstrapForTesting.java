@@ -20,6 +20,7 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Properties;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.systemPropertyAsBoolean;
@@ -85,10 +86,21 @@ public class BootstrapForTesting {
                 try (InputStream stream = FileSystemUtils.openFileURLStream(pluginPropsUrl)) {
                     properties.load(stream);
                 }
-                String clazz = properties.getProperty("classname");
-                if (clazz != null) {
-                    logger.info("loading plugin class: " + clazz);
-                    Class.forName(clazz);
+                String classname = properties.getProperty("classname");
+                if (classname != null) {
+                    int pos = classname.indexOf('/');
+                    String moduleName = pos >= 0 ? classname.substring(0, pos) : classname;
+                    String clazz = pos >= 0 ? classname.substring(pos + 1) : classname;
+                    Optional<Module> module = ModuleLayer.boot().findModule(moduleName);
+                    if (module.isPresent()) {
+                        logger.info("loading plugin module " + moduleName + " class: " + classname);
+                        Class.forName(module.get(), clazz);
+                    } else {
+                        logger.info("loading plugin class: " + classname);
+                        Class.forName(clazz);
+                    }
+                } else {
+                    throw new IllegalArgumentException("no plugin class name set in descriptor");
                 }
             }
         } catch (Exception e) {

@@ -1,29 +1,45 @@
 
 grant {
-  permission java.lang.RuntimePermission "getStackWalkerWithClassReference";
+      permission java.lang.RuntimePermission "getStackWalkerWithClassReference";
+
+      // we need libnio read permission for filesystem traversal (but why?)
+      // linux
+      permission java.io.FilePermission "/usr/lib/jvm/java-11-openjdk-11.0.2.7-0.el7_6.x86_64/lib/libnio.so", "read";
+      permission java.io.FilePermission "/usr/lib/jvm/java-11-openjdk-11.0.1.13-3.el7_6.x86_64/lib/libnio.so", "read";
+      permission java.io.FilePermission "/usr/lib/jvm/zulu-11/lib/libnio.so", "read";
+      // mac
+      permission java.io.FilePermission "/Library/Java/JavaVirtualMachines/jdk-11.0.2.jdk/Contents/Home/lib/libnio.dylib", "read";
+      permission java.io.FilePermission "/Library/Java/JavaVirtualMachines/jdk-11.0.1.jdk/Contents/Home/lib/libnio.dylib", "read";
+      permission java.io.FilePermission "/Library/Java/JavaVirtualMachines/jdk-11.jdk/Contents/Home/lib/libnio.dylib", "read";
+      permission java.io.FilePermission "/Library/Java/JavaVirtualMachines/zulu-11.jdk/Contents/Home/lib/libnio.dylib", "read";
+
 };
 
 //// additional test framework permissions.
 //// These are mock objects and test management that we allow test framework libs
 //// to provide on our behalf. But tests themselves cannot do this stuff.
 
-grant codeBase "file://${codebase.elasticsearch}" {
+grant codeBase "${codebase.elasticsearch}" {
     // needed by mockito/bytebuddy for creating mocks with the protection domain
     permission java.lang.RuntimePermission "accessDeclaredMembers";
     permission java.lang.reflect.ReflectPermission "suppressAccessChecks";
 };
 
-grant codeBase "file://${codebase.elasticsearch-tests}" {
+grant codeBase "${codebase.elasticsearch-tests}" {
     permission java.lang.RuntimePermission "accessDeclaredMembers";
     permission java.lang.reflect.ReflectPermission "suppressAccessChecks";
 };
 
-grant codeBase "file://${codebase.elasticsearch-test-framework}" {
+grant codeBase "${codebase.elasticsearch-test-framework}" {
     permission java.lang.RuntimePermission "accessDeclaredMembers";
     permission java.lang.reflect.ReflectPermission "suppressAccessChecks";
+    // needed for module plugin loading
+    permission java.lang.RuntimePermission "getClassLoader";
+    // for integration tests with netty plugin
+    permission java.net.SocketPermission "*", "accept,connect";
 };
 
-grant codeBase "file://${codebase.lucene}" {
+grant codeBase "${codebase.lucene}" {
     // needed for RAMUsageTester
     // org.apache.lucene.util.RamUsageEstimator$1.run
     permission java.lang.RuntimePermission "accessDeclaredMembers";
@@ -31,7 +47,7 @@ grant codeBase "file://${codebase.lucene}" {
     permission java.lang.reflect.ReflectPermission "suppressAccessChecks";
 };
 
-grant codeBase "file://${codebase.lucene-test-framework}" {
+grant codeBase "${codebase.lucene-test-framework}" {
     // needed by RamUsageTester
     permission java.lang.reflect.ReflectPermission "suppressAccessChecks";
     permission java.lang.RuntimePermission "accessDeclaredMembers";
@@ -41,7 +57,7 @@ grant codeBase "file://${codebase.lucene-test-framework}" {
     permission java.io.FilePermission "*", "read";
 };
 
-grant codeBase "file://${codebase.randomizedtesting-junit4-ant}" {
+grant codeBase "${codebase.randomizedtesting-junit4-ant}" {
     permission org.elasticsearch.secure_sm.ThreadPermission "modifyArbitraryThreadGroup";
     // needed to fail tests on uncaught exceptions from other threads
     permission java.lang.RuntimePermission "setDefaultUncaughtExceptionHandler";
@@ -49,9 +65,11 @@ grant codeBase "file://${codebase.randomizedtesting-junit4-ant}" {
     permission java.lang.reflect.ReflectPermission "suppressAccessChecks";
     // needed for TestClass creation
     permission java.lang.RuntimePermission "accessDeclaredMembers";
+    // needed for module plugin loading
+    permission java.lang.RuntimePermission "getClassLoader";
 };
 
-grant codeBase "file://${codebase.randomizedtesting}" {
+grant codeBase "${codebase.randomizedtesting}" {
     permission org.elasticsearch.secure_sm.ThreadPermission "modifyArbitraryThreadGroup";
     // needed to fail tests on uncaught exceptions from other threads
     permission java.lang.RuntimePermission "setDefaultUncaughtExceptionHandler";
@@ -59,15 +77,17 @@ grant codeBase "file://${codebase.randomizedtesting}" {
     permission java.lang.reflect.ReflectPermission "suppressAccessChecks";
     // needed for TestClass creation
     permission java.lang.RuntimePermission "accessDeclaredMembers";
+    // needed for module plugin loading
+    permission java.lang.RuntimePermission "getClassLoader";
 };
 
-grant codeBase "file://${codebase.junit}" {
+grant codeBase "${codebase.junit}" {
     // needed for TestClass creation
     permission java.lang.RuntimePermission "accessDeclaredMembers";
     permission java.lang.reflect.ReflectPermission "suppressAccessChecks";
 };
 
-grant codeBase "file://${codebase.securemock}" {
+grant codeBase "${codebase.securemock}" {
     // needed to access ReflectionFactory
     permission java.lang.RuntimePermission "accessClassInPackage.sun.reflect";
     permission java.lang.RuntimePermission "accessClassInPackage.jdk.internal.ref";
@@ -85,26 +105,31 @@ grant codeBase "file://${codebase.securemock}" {
     permission java.lang.RuntimePermission "getStackWalkerWithClassReference";
 };
 
-grant codeBase "file://${codebase.mocksocket}" {
+grant codeBase "${codebase.mocksocket}" {
     // mocksocket makes and accepts socket connections
     permission java.net.SocketPermission "*", "accept,connect";
 };
 
-grant codeBase "file://${codebase.elasticsearch-rest-client}" {
+grant codeBase "${codebase.elasticsearch-rest-client}" {
     // rest makes socket connections for rest tests
     permission java.net.SocketPermission "*", "connect";
     // rest client uses system properties which gets the default proxy
     permission java.net.NetPermission "getProxySelector";
 };
 
-grant codeBase "file://${codebase.httpcore-nio}" {
+grant codeBase "${codebase.httpcore-nio}" {
     // httpcore makes socket connections for rest tests
     permission java.net.SocketPermission "*", "connect";
 };
 
-grant codeBase "file://${codebase.httpasyncclient}" {
+grant codeBase "${codebase.httpasyncclient}" {
     // httpasyncclient makes socket connections for rest tests
     permission java.net.SocketPermission "*", "connect";
     // rest client uses system properties which gets the default proxy
     permission java.net.NetPermission "getProxySelector";
+};
+
+grant codeBase "${codebase.netty}" {
+    // at io.netty.util.concurrent.GlobalEventExecutor$2.run(GlobalEventExecutor.java:228) ~[netty-6.3.2.1.jar:?]
+    permission java.lang.RuntimePermission "setContextClassLoader";
 };

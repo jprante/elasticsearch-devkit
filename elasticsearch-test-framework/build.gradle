@@ -6,7 +6,7 @@ buildscript {
         }
     }
     dependencies {
-        classpath "org.xbib.elasticsearch:gradle-plugin-elasticsearch-build:6.3.2.4"
+        classpath "org.xbib.elasticsearch:gradle-plugin-elasticsearch-build:${project.property('elasticsearch-devkit-gradle-plugins.version')}"
     }
 }
 
@@ -19,7 +19,6 @@ dependencies {
     compile "org.xbib.elasticsearch:mocksocket:${project.property('elasticsearch-libs.version')}"
     compile "org.xbib.elasticsearch:elasticsearch:${project.property('elasticsearch-server.version')}"
     compile "org.xbib.elasticsearch:elasticsearch-rest-client:${project.property('elasticsearch-client.version')}"
-    
 }
 
 afterEvaluate {
@@ -98,18 +97,29 @@ esTest {
     systemProperty 'tests.logger.level', 'ALL'
     systemProperty 'tests.security.manager', 'true'
     //systemProperty 'java.security.debug', 'access,failure'
+    //systemProperty 'tests.class', 'org.elasticsearch.testframework.test.ESTestCaseTests'
+
     jvmArg '--add-reads=org.xbib.elasticsearch.securemock=org.xbib.elasticsearch.server'
 }
 
 namingConventions.enabled = false
+
 dependencyLicenses.enabled = false
+
 dependenciesInfo.enabled = false
+
 forbiddenApisMain.enabled = true
+
 forbiddenApisTest.enabled = true
+
 checkstyleMain.enabled = true
+
 checkstyleTest.enabled = true
+
 jarHell.enabled = true
+
 loggerUsageCheck.enabled = true
+
 thirdPartyAudit.enabled = false
 
 apply from: "${rootProject.projectDir}/gradle/publish.gradle"

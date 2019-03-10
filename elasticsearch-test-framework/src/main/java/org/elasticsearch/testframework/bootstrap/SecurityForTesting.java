@@ -29,8 +29,8 @@ import java.security.ProtectionDomain;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -48,15 +48,12 @@ public final class SecurityForTesting {
         Map<String, String> systemProperties = Security.createSystemProperties(codebase);
         Security.setSystemProperties(systemProperties);
         Permissions permissions = createPermissions(modulePath, javaTmpDir);
-        Map<String, Policy> pluginPolicies = getPluginPermissions();
-        // restore system properties, might be cleared while plugin security policy setup
-        Security.setSystemProperties(systemProperties);
+        Map<URI, Policy> pluginPolicies = getPluginPermissions(systemProperties);
         try {
             ESPolicy esPolicy = Security.createPolicy(permissions, pluginPolicies, filterBadDefaults);
-
             // read test framework permissions
             URL url = BootstrapForTesting.class.getResource("elasticsearch-test-framework.policy");
-            Policy tmpTestFrameworkPolicy = null;
+            Policy tmpTestFrameworkPolicy;
             if (url != null) {
                 logger.info("reading test framework policy: " + url);
                 tmpTestFrameworkPolicy = ESPolicy.readPolicy(url.toURI());
@@ -75,7 +72,6 @@ public final class SecurityForTesting {
                 }
             }
             final Policy extraPolicy = tmpExtraPolicy;
-
             Policy.setPolicy(new Policy() {
                 @Override
                 public boolean implies(ProtectionDomain domain, Permission permission) {
@@ -141,12 +137,12 @@ public final class SecurityForTesting {
      * like core, test-framework, etc. this way tests fail if accesscontroller blocks are missing.
      */
     @SuppressForbidden(reason = "accesses fully qualified URLs to configure security")
-    private static Map<String, Policy> getPluginPermissions() throws IOException {
-        Map<String,Policy> map = new HashMap<>();
+    private static Map<URI, Policy> getPluginPermissions(Map<String, String> systemProperties) throws IOException {
+        Map<URI, Policy> map = new LinkedHashMap<>();
         try {
-            List<URL> pluginPolicies = Collections.list(BootstrapForTesting.class.getClassLoader()
+            List<URL> pluginPolicyURLs = Collections.list(BootstrapForTesting.class.getClassLoader()
                     .getResources(PluginInfo.ES_PLUGIN_POLICY));
-            if (pluginPolicies.isEmpty()) {
+            if (pluginPolicyURLs.isEmpty()) {
                 logger.warn("no plugin policies");
                 return Collections.emptyMap();
             }
@@ -166,21 +162,17 @@ public final class SecurityForTesting {
             ));
             codebases.removeAll(excluded);
 
-            final List<Policy> policies = new ArrayList<>(pluginPolicies.size());
-            Map<String, String> systemProperties = Security.createSystemProperties(Security.createCodebase(codebases));
-            Security.setSystemProperties(systemProperties);
-            try {
-                // parse each policy file, with codebase substitution from the classpath
-                for (URL policyFile : pluginPolicies) {
-                    policies.add(ESPolicy.readPolicy(policyFile.toURI()));
-                }
-            } finally {
-                Security.clearSystemProperties(systemProperties);
+            final List<Policy> policies = new ArrayList<>(pluginPolicyURLs.size());
+            Map<String, String> pluginSystemProperties = Security.createSystemProperties(Security.createCodebase(codebases));
+            Security.setSystemProperties(pluginSystemProperties);
+            systemProperties.putAll(pluginSystemProperties);
+            // parse each policy file, with codebase substitution from the classpath
+            for (URL policyFile : pluginPolicyURLs) {
+                policies.add(ESPolicy.readPolicy(policyFile.toURI()));
             }
-
             // consult each policy file for those codebases
             for (URI uri : codebases) {
-                map.put(uri.toURL().getFile(), new Policy() {
+                map.put(uri, new Policy() {
                     @Override
                     public boolean implies(ProtectionDomain domain, Permission permission) {
                         // implements union
