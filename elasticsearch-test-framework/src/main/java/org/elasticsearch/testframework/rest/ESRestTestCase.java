@@ -10,7 +10,7 @@ import org.apache.http.entity.StringEntity;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.nio.conn.ssl.SSLIOSessionStrategy;
 import org.apache.http.ssl.SSLContexts;
-import org.elasticsearch.common.xcontent.XContentMapValues; // from org.elasticsearch.common.xcontent.support.XContentMapValues
+import org.elasticsearch.common.xcontent.support.XContentMapValues;
 import org.elasticsearch.action.admin.cluster.node.tasks.list.ListTasksAction;
 import org.elasticsearch.client.rest.Response;
 import org.elasticsearch.client.rest.ResponseException;
