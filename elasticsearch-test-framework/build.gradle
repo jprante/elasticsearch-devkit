@@ -112,6 +112,9 @@ forbiddenApisMain.enabled = true
 
 forbiddenApisTest.enabled = true
 
+// java.lang.ClassCastException: class org.apache.xerces.parsers.XIncludeAwareParserConfiguration cannot be cast to class org.apache.xerces.xni.parser.XMLParserConfiguration
+licenseHeaders.enabled = false
+
 checkstyleMain.enabled = true
 
 checkstyleTest.enabled = true

@@ -201,11 +201,16 @@ public final class SecurityForTesting {
         Set<URI> cooked = new HashSet<>(raw.size());
         Set<URI> uris = new LinkedHashSet<>();
         for (URI uri : raw) {
-            boolean added = cooked.add(PathUtils.get(uri).toRealPath().toUri());
-            if (!added) {
-                throw new IllegalStateException("Duplicate in module path after resolving symlinks: " + uri);
+            if (uri.getScheme().equals("jrt")) {
+                // if module path, there is no such thing as symlink or dubious paths, avoid PathUtils
+                uris.add(uri);
+            } else {
+                boolean added = cooked.add(PathUtils.get(uri).toRealPath().toUri());
+                if (!added) {
+                    throw new IllegalStateException("Duplicate in module path after resolving symlinks: " + uri);
+                }
+                uris.add(uri);
             }
-            uris.add(uri);
         }
         return uris;
     }
