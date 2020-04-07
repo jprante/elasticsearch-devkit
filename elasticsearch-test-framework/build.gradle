@@ -2,7 +2,7 @@ buildscript {
     repositories {
         jcenter()
         maven {
-            url 'http://xbib.org/repository'
+            url 'https://xbib.org/repository'
         }
     }
     dependencies {
